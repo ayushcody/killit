@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Killit Modifications Guide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Killit <span>V1</span> Reference Guide</h1>
+            <p>Interactive reference for safety-aware, cross-platform port killing modifications.</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-target="modifications">Modifications</button>
+            <button class="tab-btn" data-target="build-order">Build Order</button>
+        </nav>
+
+        <main>
+            <section id="modifications" class="tab-content active">
+                <div class="cards-container">
+                    <!-- Card 1 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="os-badge linux">Linux</span>
+                            <h2>The /proc-first resolver</h2>
+                        </div>
+                        <p>The guide treats Linux the same as macOS, but Linux containers often lack <code>lsof</code>.
+                            The /proc-first resolver ensures native performance in Docker/Alpine without external
+                            dependencies.</p>
+                        <button class="btn show-code" data-code="code-1">Show me the code</button>
+                        <div id="code-1" class="code-snippet hidden">
+                            <pre><code class="language-javascript">import fs from 'fs';
+
+export function resolveLinuxPids(port) {
+  // Read /proc/net/tcp and parse hex ports
+  const tcpFile = fs.readFileSync('/proc/net/tcp', 'utf-8');
+  const lines = tcpFile.split('\n').slice(1);
+  const pids = new Set();
+  
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    // Implementation logic to match port...
+  }
+  return Array.from(pids);
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="os-badge windows">Windows</span>
+                            <h2>PowerShell over wmic</h2>
+                        </div>
+                        <p><code>wmic</code> is disabled by default in newer Windows 11 builds, causing silent failures.
+                            PowerShell's <code>Get-NetTCPConnection</code> and <code>Get-Process</code> provide a robust
+                            alternative.</p>
+                        <button class="btn show-code" data-code="code-2">Show me the code</button>
+                        <div id="code-2" class="code-snippet hidden">
+                            <pre><code class="language-javascript">import { execSync } from 'child_process';
+
+export function resolveWindowsPids(port) {
+  try {
+    const cmd = `Get-NetTCPConnection -LocalPort ${port} | Select-Object -ExpandProperty OwningProcess`;
+    const output = execSync(`powershell -NoProfile -Command "${cmd}"`);
+    return output.toString().trim().split('\n').filter(Boolean);
+  } catch (error) {
+    return [];
+  }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="os-badge core">Core</span>
+                            <h2>Classifier Fallthrough Fix</h2>
+                        </div>
+                        <p>If metadata lookup fails due to permissions, the classifier previously fell through to
+                            <code>safety: 'safe'</code>. Unknown metadata should explicitly mean <strong>unknown
+                                risk</strong>.</p>
+                        <button class="btn show-code" data-code="code-3">Show me the code</button>
+                        <div id="code-3" class="code-snippet hidden">
+                            <pre><code class="language-javascript">export function classifyProcess(metadata) {
+  // FIXED Logical Hole
+  if (!metadata || metadata.error === 'EPERM') {
+    return { 
+      safety: 'unknown', 
+      risk: 'high',
+      reason: 'Permissions restricted or metadata unavailable'
+    }; 
+  }
+  
+  // Existing specific rule mappings below...
+  return { safety: 'safe', risk: 'low' };
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Card 4 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="os-badge feature">Feature</span>
+                            <h2>The --tree Flag</h2>
+                        </div>
+                        <p>Watcher-based port occupancy (nodemon, vite, dotnet watch) is the dominant real-world case.
+                            The <code>--tree</code> flag kills the entire process group, preventing lingering child
+                            processes.</p>
+                        <button class="btn show-code" data-code="code-4">Show me the code</button>
+                        <div id="code-4" class="code-snippet hidden">
+                            <pre><code class="language-javascript">export function killProcessTree(pid) {
+  try {
+    // On Unix, pass negative PID to signal the entire process group
+    process.kill(-pid, 'SIGTERM'); 
+  } catch (e) {
+    if (e.code === 'ESRCH') return; // Process already dead
+    // Fallback: manually transverse children and kill
+  }
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="build-order" class="tab-content">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-dot">1</div>
+                        <div class="timeline-content">
+                            <h3>TypeScript & Project Foundations</h3>
+                            <p>Initialize project, configure build tools, set up abstract base classes for platform
+                                resolvers, and define the CLI argument schema before any functional code.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot">2</div>
+                        <div class="timeline-content">
+                            <h3>OS Resolvers Implementation</h3>
+                            <p>Build platform-specific resolvers: Native <code>/proc</code> resolver for Linux,
+                                PowerShell resolver for Windows, and <code>lsof</code> for macOS. Test them in
+                                isolation.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot">3</div>
+                        <div class="timeline-content">
+                            <h3>Process Classifier Engine</h3>
+                            <p>Implement <code>classify.ts</code> focusing on the security mechanism. Incorporate the
+                                unknown risk fallback for restricted permissions as patched above.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot">4</div>
+                        <div class="timeline-content">
+                            <h3>Action Layer & --tree Flag</h3>
+                            <p>Build the kill coordination logic, supporting single process and process tree signals
+                                (<code>-pid</code> in Unix) for watcher compatibility.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
